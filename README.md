@@ -3,7 +3,7 @@
 A modern, high-performance autonomous driving assistant using FastAPI backend with real-time video processing, object detection, road segmentation, and AI-powered decision making.
 ## WorkFlow 
 <p align="center">
-  <img src="asset/workflow.png" width="1000">
+  <img src="asset/workflow.png" width="800">
 </p>
 The AI Driving Co-Pilot combines computer vision, intent understanding, and LLM reasoning to provide driving assistance and scene understanding.
 
@@ -22,11 +22,11 @@ The AI Driving Co-Pilot combines computer vision, intent understanding, and LLM 
 ## 📊 Example Output
 
 <p align="center">
-  <img src="asset/pipeline_output.png" width="1000">
+  <img src="asset/pipeline_output.png" width="600">
 </p>
 
 <p align="center">
-  <img src="asset/pipeline_output_2.png" width="1000">
+  <img src="asset/pipeline_output_2.png" width="600">
 </p>
 
 
