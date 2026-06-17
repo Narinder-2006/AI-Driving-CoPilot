@@ -25,7 +25,7 @@ from pipeline import (
     CONFIG,
     load_all_models,
     run_yolo,
-    run_unet_array,
+    run_unet,
     run_bilstm,
     run_transformer,
 )
@@ -132,7 +132,7 @@ def run_inference_on_frame(frame_bgr: np.ndarray, user_query: str, imgsz: int = 
     detection_str = ", ".join(detections) if detections else "no objects detected"
 
     # ── 2. UNet ──────────────────────────────
-    unet_overlay, _mask, drivable_pct = run_unet_array(
+    unet_overlay, _mask, drivable_pct = run_unet(
         MODELS["unet"], frame_bgr, CONFIG["unet_input_size"]
     )
 
