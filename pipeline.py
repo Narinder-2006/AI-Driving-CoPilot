@@ -180,42 +180,12 @@ def run_unet(unet_model, image_path, input_size, horizon_ratio=0.4):
     return overlay, mask, drivable
 
 
-def run_unet(unet_model, image_path, input_size):
-        print("🗺️  Running UNet segmentation...")
-        orig = cv2.imread(image_path)
-        img  = cv2.resize(orig, (input_size[1], input_size[0]))
-        inp  = img.astype(np.float32) / 255.0
-        inp  = np.expand_dims(inp, axis=0)          # (1, H, W, 3)
-     
-        mask_pred = unet_model.predict(inp, verbose=0)[0]  # (H, W, C) or (H, W, 1)
-     
-        # Handle binary or multi-class masks
-        if mask_pred.shape[-1] == 1:
-            mask = (mask_pred[:, :, 0] > 0.5).astype(np.uint8) * 255
-        else:
-            mask = np.argmax(mask_pred, axis=-1).astype(np.uint8)
-            mask = (mask * (255 // max(mask.max(), 1))).astype(np.uint8)
-     
-        # Compute drivable area %
-        binary    = (mask > 127).astype(np.uint8)
-        drivable  = round(binary.sum() / binary.size * 100, 1)
-     
-        # Overlay mask on original image
-        mask_rgb  = cv2.cvtColor(
-            cv2.resize(mask, (orig.shape[1], orig.shape[0])),
-            cv2.COLOR_GRAY2BGR
-        )
-        overlay   = cv2.addWeighted(orig, 0.6, mask_rgb, 0.4, 0)
-     
-        print(f"   Drivable area: {drivable}%")
-        return overlay, mask, drivable
-     
-     
 
 
     # ============================================================
     # LOAD VECTORIZER (add this inside load_all_models)
     # ============================================================
+
 def load_vectorizer(vocab_path, vocab_size=1000, max_length=15):
         print("  [3b] Loading TextVectorization vocabulary...")
         import json
@@ -357,60 +327,66 @@ def run_transformer(tokenizer, t5_model, user_query, yolo_detections,
 
 
 from collections import Counter
+
 def make_natural_decision(raw, bilstm_label, detections, drivable):
-    
-        add = ""
-    
-        if "check safety" in bilstm_label.lower():
-    
-            objects = [d.split("(")[0].strip() for d in detections] if detections else ["obstacle"]
-            obj_str = " and ".join(objects[:2])
-    
-            add = (
-                f"⚠️ STOP IMMEDIATELY. {obj_str} detected in path. "
-                f"Drivable area is only {drivable}%. Do not proceed."
-            )
-    
-        elif "summarize" in bilstm_label.lower():
-    
-            det_str = ", ".join(detections[:3]) if detections else "no objects"
-    
-            add = (
-                f"🔍 Scene summary: {det_str} detected. "
-                f"Drivable area is {drivable}%. Proceed with caution."
-            )
-    
-        elif "query objects" in bilstm_label.lower():
-    
-            det_str = ", ".join(detections) if detections else "no objects detected"
-    
-            add = (
-                f"🎯 Objects in scene: {det_str}. "
-                f"Drivable area: {drivable}%."
-            )
-    
-        elif drivable >= 40:
-    
-            add = (
-                f"✅ Path appears clear ({drivable}% drivable). "
-                f"Safe to proceed. Monitor surroundings."
-            )
-    
+
+    add = ""
+
+    if "check safety" in bilstm_label.lower():
+
+        objects = [d.split("(")[0].strip() for d in detections] if detections else ["obstacle"]
+        object_set=list(set(objects))
+        obj_str = " and ".join(object_set[:2])
+        
+        if drivable <=45:
+         add = (
+            f"⚠️ STOP IMMEDIATELY. {obj_str} detected in path. "
+            f"Drivable area is only {drivable}%. Do not proceed."
+         )
         else:
-    
-            add = (
-                f"⚠️ Drivable area is {drivable}%. "
-                f"Proceed with caution."
-            )
-    
-        # Clean transformer output
-        raw = raw.strip()
-    
-        # Return both
-        if raw:
-            return f"{add}\n\n🤖 AI Reasoning: {raw}"
-    
-        return add
+            add=(f"Drivable area is {drivable}%. Proceed with caution.")
+        
+
+    elif "summarize" in bilstm_label.lower():
+
+        det_str = ", ".join(detections[:3]) if detections else "no objects"
+
+        add = (
+            f"🔍 Scene summary: {det_str} detected. "
+            f"Drivable area is {drivable}%. Proceed with caution."
+        )
+
+    elif "query objects" in bilstm_label.lower():
+
+        det_str = ", ".join(detections) if detections else "no objects detected"
+
+        add = (
+            f"🎯 Objects in scene: {det_str}. "
+            f"Drivable area: {drivable}%."
+        )
+
+    elif drivable >= 58:
+
+        add = (
+            f"✅ Path appears clear ({drivable}% drivable). "
+            f"Safe to proceed. Monitor surroundings."
+        )
+
+    else:
+
+        add = (
+            f"⚠️ Drivable area is {drivable}%. "
+            f"Proceed with caution."
+        )
+
+    # Clean transformer output
+    raw = raw.strip()
+
+    # Return both
+    if raw:
+        return f"{add}\n\n🤖 AI Reasoning: {raw}"
+
+    return add
 
 
 
