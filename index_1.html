@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🚗 AI Driving Co-Pilot</title>
+
+  <!-- ═══════════════════════════════════════════════════
+       STYLES
+  ══════════════════════════════════════════════════════ -->
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Base ── */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0d1117 0%, #1a1f2e 100%);
+      color: #e6e6e6;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      padding: 24px 20px;
+      background: linear-gradient(135deg, #1a1f2e, #2d3748);
+      border-radius: 12px;
+      border: 1px solid #404854;
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      font-size: 2.2rem;
+      background: linear-gradient(135deg, #00d4ff, #a0ff80);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p { color: #888; margin-top: 6px; }
+
+    /* ── Layout ── */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 1100px) { .main-layout { grid-template-columns: 1fr; } }
+
+    /* ── Panels ── */
+    .panel {
+      background: #1a1f2e;
+      border: 1px solid #404854;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Controls ── */
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .ctrl-group { display: flex; flex-direction: column; gap: 6px; }
+    .ctrl-group label { font-size: 0.82rem; font-weight: 600; color: #00d4ff; }
+
+    select, input[type="file"] {
+      padding: 8px 12px;
+      background: #2d3748;
+      color: #e6e6e6;
+      border: 1px solid #404854;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: border-color .25s;
+    }
+    select:hover, select:focus,
+    input[type="file"]:hover { border-color: #00d4ff; outline: none; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 9px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .25s;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary  { background: linear-gradient(135deg,#00d4ff,#00a8cc); color:#fff; }
+    .btn-primary:hover:not(:disabled)  { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,212,255,.35); }
+    .btn-danger   { background: linear-gradient(135deg,#ff4b4b,#cc0000); color:#fff; }
+    .btn-danger:hover:not(:disabled)   { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(255,75,75,.35); }
+    .btn-secondary{ background: #404854; color:#e6e6e6; }
+    .btn-secondary:hover:not(:disabled){ background:#505860; }
+    .btn-green    { background: linear-gradient(135deg,#a0ff80,#60cc40); color:#0d1117; }
+    .btn-green:hover:not(:disabled)    { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(160,255,128,.35); }
+
+    /* ── Video container ── */
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #0d1117;
+      border: 2px solid #404854;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #liveVideo, #uploadedVideo {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+    #annotatedImg {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: none;          /* shown after first analyse */
+      border: 2px solid #a0ff80;
+      border-radius: 6px;
+    }
+    .placeholder-msg {
+      color: #555;
+      font-size: 0.95rem;
+      text-align: center;
+      padding: 20px;
+    }
+
+    /* overlay toggle */
+    #overlayToggle {
+      position: absolute;
+      top: 8px; right: 8px;
+      font-size: 0.75rem;
+      padding: 5px 10px;
+      z-index: 10;
+      opacity: .85;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      position: absolute;
+      width: 52px; height: 52px;
+      border: 5px solid #404854;
+      border-top-color: #00d4ff;
+      border-radius: 50%;
+      animation: spin .9s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Telemetry ── */
+    .telemetry {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px,1fr));
+      gap: 10px;
+    }
+    .tel-card {
+      background: #2d3748;
+      border: 1px solid #404854;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .tel-card .tel-label { font-size: 0.78rem; color: #888; margin-bottom: 4px; }
+    .tel-card .tel-value { font-size: 1.05rem; font-weight: 700; color: #a0ff80; }
+    .tel-card.status .tel-value { color: #00d4ff; }
+
+    /* ── Chat panel ── */
+    .chat-panel {
+      height: 100%;
+      min-height: 600px;
+    }
+    .chat-panel h2 { font-size: 1.2rem; color: #00d4ff; }
+    .chat-panel .sub { font-size: 0.82rem; color: #888; margin-top: 2px; }
+
+    .chat-history {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 4px;
+      max-height: 420px;   /* scrollable */
+    }
+
+    /* custom scrollbar */
+    .chat-history::-webkit-scrollbar { width: 6px; }
+    .chat-history::-webkit-scrollbar-track { background: #1a1f2e; }
+    .chat-history::-webkit-scrollbar-thumb { background: #404854; border-radius: 3px; }
+
+    .msg { display: flex; animation: slideUp .25s ease; }
+    @keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    .msg.user      { justify-content: flex-end; }
+    .msg.assistant { justify-content: flex-start; }
+    .msg.system    { justify-content: center; }
+
+    .bubble {
+      max-width: 90%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.55;
+      word-wrap: break-word;
+    }
+    .msg.user      .bubble { background: #2b313e; color: #fff; }
+    .msg.assistant .bubble { background: #2d3748; color: #e6e6e6; border-left: 3px solid #ff4b4b; }
+    .msg.system    .bubble { background: transparent; color: #666; font-style: italic; font-size:0.85rem; }
+
+    /* ── Intent badge ── */
+    .intent-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      border: 1px solid;
+    }
+    .badge-safety   { color:#ff4b4b; border-color:#ff4b4b; background:rgba(255,75,75,.1); }
+    .badge-summarize{ color:#a0ff80; border-color:#a0ff80; background:rgba(160,255,128,.1); }
+    .badge-query    { color:#ffaa00; border-color:#ffaa00; background:rgba(255,170,0,.1); }
+    .badge-default  { color:#00d4ff; border-color:#00d4ff; background:rgba(0,212,255,.1); }
+
+    /* ── Chat input ── */
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid #404854;
+    }
+    #queryInput {
+      flex: 1;
+      padding: 10px 12px;
+      background: #2d3748;
+      color: #e6e6e6;
+      border: 1px solid #404854;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: border-color .25s;
+    }
+    #queryInput:focus { outline: none; border-color: #00d4ff; }
+    #queryInput::placeholder { color: #555; }
+
+    /* ── Annotated frame viewer (inside chat) ── */
+    #resultFrame {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid #404854;
+      display: none;
+      margin-top: 8px;
+    }
+
+    /* ── Analyse button row ── */
+    .analyse-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    #analyseStatus {
+      font-size: 0.82rem;
+      color: #888;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .header h1 { font-size: 1.5rem; }
+      .controls-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <h1>🚗 Autonomous Driving AI Co-Pilot</h1>
+    <p>Real-time vision &amp; AI-powered driving assistance</p>
+  </header>
+
+  <div class="main-layout">
+
+    <!-- ═══════════════════════════════════════════
+         LEFT — Video + telemetry
+    ════════════════════════════════════════════ -->
+    <div class="panel">
+
+      <!-- Controls row -->
+      <div class="controls-row">
+
+        <div class="ctrl-group">
+          <label>📹 Source</label>
+          <select id="sourceMode" onchange="switchMode()">
+            <option value="webcam">Webcam (Live)</option>
+            <option value="upload">Upload Video</option>
+          </select>
+        </div>
+
+        <!-- Webcam controls -->
+        <div id="webcamCtrl" class="controls-row" style="gap:8px;">
+          <button id="startBtn" class="btn btn-primary" onclick="startWebcam()">▶️ Start</button>
+          <button id="stopBtn"  class="btn btn-secondary" onclick="stopWebcam()" disabled>⏹ Stop</button>
+        </div>
+
+        <!-- Upload controls -->
+        <div id="uploadCtrl" style="display:none;">
+          <input type="file" id="videoFile" accept="video/*" onchange="loadVideo()" />
+        </div>
+
+        <div class="ctrl-group">
+          <label>⚡ YOLO size</label>
+          <select id="imgsz">
+            <option value="256" selected>256 – Fastest</option>
+            <option value="320">320 – Balanced</option>
+            <option value="416">416 – Accurate</option>
+            <option value="640">640 – Best</option>
+          </select>
+        </div>
+
+      </div><!-- /controls-row -->
+
+      <!-- Video wrapper -->
+      <div class="video-wrapper" id="videoWrapper">
+        <p class="placeholder-msg" id="placeholder">Select a source above to begin</p>
+
+        <!-- Live webcam -->
+        <video id="liveVideo" autoplay muted playsinline></video>
+
+        <!-- Uploaded video -->
+        <video id="uploadedVideo" controls></video>
+
+        <!-- Annotated result overlay (shown after Analyse) -->
+        <img id="annotatedImg" alt="Annotated frame" />
+
+        <!-- Toggle between raw and annotated -->
+        <button class="btn btn-secondary" id="overlayToggle"
+                onclick="toggleOverlay()" style="display:none;">
+          👁 Show raw
+        </button>
+
+        <div class="spinner" id="spinner"></div>
+      </div>
+
+      <!-- Analyse button -->
+      <div class="analyse-row">
+        <button class="btn btn-green" id="analyseBtn"
+                onclick="analyseScene()" disabled>
+          🔍 Analyse Scene
+        </button>
+        <span id="analyseStatus">—</span>
+      </div>
+
+      <!-- Telemetry cards -->
+      <div class="telemetry">
+        <div class="tel-card status">
+          <div class="tel-label">⚙️ Server</div>
+          <div class="tel-value" id="serverStatus">Checking…</div>
+        </div>
+        <div class="tel-card">
+          <div class="tel-label">🗺️ Drivable Area</div>
+          <div class="tel-value" id="drivablePct">—</div>
+        </div>
+        <div class="tel-card">
+          <div class="tel-label">🔍 Detected Objects</div>
+          <div class="tel-value" id="detections" style="font-size:0.85rem;color:#e6e6e6;">—</div>
+        </div>
+      </div>
+
+    </div><!-- /left panel -->
+
+    <!-- ═══════════════════════════════════════════
+         RIGHT — Chat
+    ════════════════════════════════════════════ -->
+    <div class="panel chat-panel">
+
+      <div>
+        <h2>🤖 AI Co-Pilot Chat</h2>
+        <p class="sub">Start the camera, then ask about the scene.</p>
+      </div>
+
+      <!-- Chat history -->
+      <div class="chat-history" id="chatHistory">
+        <div class="msg system">
+          <div class="bubble">Welcome! Click <strong>Analyse Scene</strong> or type a question below.</div>
+        </div>
+      </div>
+
+      <!-- Annotated frame (small, inside chat) -->
+      <img id="resultFrame" alt="Last analysed frame" />
+
+      <!-- Input -->
+      <div class="chat-input-row">
+        <input type="text" id="queryInput"
+               placeholder="Ask: Is it safe? What's around me?"
+               onkeydown="if(event.key==='Enter') sendChat()" />
+        <button class="btn btn-danger" onclick="sendChat()">Send</button>
+      </div>
+
+    </div><!-- /right panel -->
+
+  </div><!-- /main-layout -->
+</div><!-- /container -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════ -->
+<script>
+/* ──────────────────────────────────────────
+   State
+────────────────────────────────────────── */
+let webcamStream  = null;   // MediaStream from getUserMedia
+let showAnnotated = true;   // toggle between raw / annotated
+let videoReady    = false;  // true once webcam or video is active
+const API         = "http://localhost:8000";     // same origin; change to "http://localhost:8000" if needed
+
+/* ──────────────────────────────────────────
+   On load — poll server until ready
+────────────────────────────────────────── */
+window.addEventListener("load", () => {
+  checkServerStatus();
+  setInterval(checkServerStatus, 8000);
+});
+
+async function checkServerStatus() {
+  try {
+    const r = await fetch(`${API}/api/status`);
+    const d = await r.json();
+    const el = document.getElementById("serverStatus");
+    if (d.models_loaded) {
+      el.textContent = "✅ Ready";
+      el.style.color = "#a0ff80";
+    } else {
+      el.textContent = "⏳ Loading models…";
+      el.style.color = "#ffaa00";
+    }
+  } catch {
+    document.getElementById("serverStatus").textContent = "❌ Offline";
+    document.getElementById("serverStatus").style.color = "#ff4b4b";
+  }
+}
+
+/* ──────────────────────────────────────────
+   Mode switch
+────────────────────────────────────────── */
+function switchMode() {
+  const mode = document.getElementById("sourceMode").value;
+  stopWebcam();                             // always tidy up
+
+  document.getElementById("webcamCtrl").style.display = mode === "webcam" ? "flex"  : "none";
+  document.getElementById("uploadCtrl").style.display = mode === "upload" ? "block" : "none";
+
+  // Hide both videos; show placeholder
+  showElement("liveVideo",     false);
+  showElement("uploadedVideo", false);
+  showElement("placeholder",   true);
+  hideAnnotated();
+  setVideoReady(false);
+}
+
+/* ──────────────────────────────────────────
+   Webcam
+────────────────────────────────────────── */
+async function startWebcam() {
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    const vid = document.getElementById("liveVideo");
+    vid.srcObject = webcamStream;
+    showElement("liveVideo",   true);
+    showElement("placeholder", false);
+    setVideoReady(true);
+    document.getElementById("startBtn").disabled = true;
+    document.getElementById("stopBtn").disabled  = false;
+  } catch (err) {
+    alert("⚠️ Could not access webcam: " + err.message);
+  }
+}
+
+function stopWebcam() {
+  if (webcamStream) {
+    webcamStream.getTracks().forEach(t => t.stop());
+    webcamStream = null;
+  }
+  document.getElementById("liveVideo").srcObject = null;
+  showElement("liveVideo",   false);
+  showElement("placeholder", true);
+  setVideoReady(false);
+  document.getElementById("startBtn").disabled = false;
+  document.getElementById("stopBtn").disabled  = true;
+}
+
+/* ──────────────────────────────────────────
+   Video upload — just play it locally
+────────────────────────────────────────── */
+function loadVideo() {
+  const file = document.getElementById("videoFile").files[0];
+  if (!file) return;
+  const url  = URL.createObjectURL(file);
+  const vid  = document.getElementById("uploadedVideo");
+  vid.src    = url;
+  showElement("uploadedVideo", true);
+  showElement("placeholder",   false);
+  setVideoReady(true);
+}
+
+/* ──────────────────────────────────────────
+   Capture current frame → canvas → Blob
+────────────────────────────────────────── */
+function captureFrame() {
+  // pick whichever video element is visible
+  const vid = webcamStream
+    ? document.getElementById("liveVideo")
+    : document.getElementById("uploadedVideo");
+
+  if (!vid || (vid.readyState < 2 && !webcamStream)) {
+    throw new Error("Video not ready — please start playback first.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width  = vid.videoWidth  || 640;
+  canvas.height = vid.videoHeight || 360;
+  canvas.getContext("2d").drawImage(vid, 0, 0, canvas.width, canvas.height);
+
+  return new Promise(resolve =>
+    canvas.toBlob(resolve, "image/jpeg", 0.85)
+  );
+}
+
+/* ──────────────────────────────────────────
+   Analyse Scene (button click)
+────────────────────────────────────────── */
+async function analyseScene() {
+  const query = "Summarize the scene";   // default when using button
+  await runInference(query);
+}
+
+/* ──────────────────────────────────────────
+   Send Chat
+────────────────────────────────────────── */
+async function sendChat() {
+  const input = document.getElementById("queryInput");
+  const query = input.value.trim();
+  if (!query) return;
+
+  if (!videoReady) {
+    addMessage("system", "⚠️ Please start the webcam or load a video first.");
+    return;
+  }
+
+  input.value = "";
+  addMessage("user", query);
+  await runInference(query);
+}
+
+/* ──────────────────────────────────────────
+   Core — capture → POST → display
+────────────────────────────────────────── */
+async function runInference(query) {
+  if (!videoReady) {
+    addMessage("system", "⚠️ No video source active. Start the webcam or load a video.");
+    return;
+  }
+
+  setSpinner(true);
+  setAnalyseStatus("⏳ Analysing…");
+
+  let blob;
+  try {
+    blob = await captureFrame();
+  } catch (err) {
+    setSpinner(false);
+    setAnalyseStatus("❌ " + err.message);
+    return;
+  }
+
+  // Build multipart form
+  const form = new FormData();
+  form.append("frame", blob, "frame.jpg");
+  form.append("query", query);
+  form.append("imgsz", document.getElementById("imgsz").value);
+
+  try {
+    const resp = await fetch(`${API}/api/analyse`, { method: "POST", body: form });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || "Server error");
+    }
+
+    const data = await resp.json();
+    displayResults(data, query);
+
+  } catch (err) {
+    addMessage("system", "❌ Error: " + err.message);
+    setAnalyseStatus("❌ Failed");
+  } finally {
+    setSpinner(false);
+  }
+}
+
+/* ──────────────────────────────────────────
+   Display results
+────────────────────────────────────────── */
+function displayResults(data, query) {
+  // ── Telemetry cards ──
+  document.getElementById("drivablePct").textContent = data.drivable_pct + "%";
+  document.getElementById("detections").textContent  = data.detections || "none";
+  setAnalyseStatus(`✅ Done — ${data.drivable_pct}% drivable`);
+
+  // ── Annotated frame overlay ──
+  if (data.annotated_frame) {
+    const img = document.getElementById("annotatedImg");
+    img.src = "data:image/jpeg;base64," + data.annotated_frame;
+    showElement("annotatedImg", true);
+    showElement("overlayToggle", true);
+    showAnnotated = true;
+    document.getElementById("overlayToggle").textContent = "👁 Show raw";
+
+    // small copy in chat
+    const resultFrame = document.getElementById("resultFrame");
+    resultFrame.src = img.src;
+    resultFrame.style.display = "block";
+  }
+
+  // ── Chat bubble ──
+  const intentClass = getIntentClass(data.bilstm_label);
+  const badge = `<span class="intent-badge ${intentClass}">${data.bilstm_emoji} ${data.bilstm_label} (${data.bilstm_conf})</span>`;
+  const body  = `${badge}<br>${escHtml(data.decision)}`;
+  addMessage("assistant", body, true);
+}
+
+/* ──────────────────────────────────────────
+   Toggle raw / annotated overlay
+────────────────────────────────────────── */
+function toggleOverlay() {
+  showAnnotated = !showAnnotated;
+  const ann = document.getElementById("annotatedImg");
+  ann.style.display = showAnnotated ? "block" : "none";
+  document.getElementById("overlayToggle").textContent =
+    showAnnotated ? "👁 Show raw" : "👁 Show annotated";
+}
+
+/* ──────────────────────────────────────────
+   Chat helpers
+────────────────────────────────────────── */
+function addMessage(role, content, isHtml = false) {
+  const history = document.getElementById("chatHistory");
+  const wrap    = document.createElement("div");
+  wrap.className = `msg ${role}`;
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (isHtml) bubble.innerHTML = content;
+  else        bubble.textContent = content;
+
+  wrap.appendChild(bubble);
+  history.appendChild(wrap);
+  history.scrollTop = history.scrollHeight;
+}
+
+function getIntentClass(label = "") {
+  const l = label.toLowerCase();
+  if (l.includes("safety"))    return "badge-safety";
+  if (l.includes("summarize")) return "badge-summarize";
+  if (l.includes("query"))     return "badge-query";
+  return "badge-default";
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+}
+
+/* ──────────────────────────────────────────
+   UI utilities
+────────────────────────────────────────── */
+function showElement(id, visible) {
+  document.getElementById(id).style.display = visible ? "block" : "none";
+}
+
+function setSpinner(on) {
+  document.getElementById("spinner").style.display = on ? "block" : "none";
+}
+
+function setAnalyseStatus(msg) {
+  document.getElementById("analyseStatus").textContent = msg;
+}
+
+function setVideoReady(ready) {
+  videoReady = ready;
+  document.getElementById("analyseBtn").disabled = !ready;
+}
+
+function hideAnnotated() {
+  showElement("annotatedImg",   false);
+  showElement("overlayToggle",  false);
+  document.getElementById("resultFrame").style.display = "none";
+}
+</script>
+</body>
+</html>
