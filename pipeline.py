@@ -129,33 +129,55 @@ def run_yolo(yolo_model, image_path):
      
     # ============================================================
     # 3. UNET PREDICTION
-    # ============================================================
-def run_unet_array(unet_model, orig, input_size):
-        """Same as run_unet() below, but operates directly on an in-memory
-        BGR frame (np.ndarray) instead of a file path. Use this for video /
-        webcam pipelines so every frame avoids a disk write+read round trip."""
-        img  = cv2.resize(orig, (input_size[1], input_size[0]))
-        inp  = img.astype(np.float32) / 255.0
-        inp  = np.expand_dims(inp, axis=0)          # (1, H, W, 3)
+def run_unet(unet_model, image_path, input_size, horizon_ratio=0.4):
+    print("🗺️  Running UNet segmentation...")
+    orig = cv2.imread(image_path)
+    if orig is None:
+        print(f"❌ Error loading image: {image_path}")
+        return None, None, 0.0
 
-        mask_pred = unet_model.predict(inp, verbose=0)[0]  # (H, W, C) or (H, W, 1)
+    img  = cv2.resize(orig, (input_size[1], input_size[0]))
+    inp  = img.astype(np.float32) / 255.0
+    inp  = np.expand_dims(inp, axis=0)          # (1, H, W, 3)
 
-        if mask_pred.shape[-1] == 1:
-            mask = (mask_pred[:, :, 0] > 0.5).astype(np.uint8) * 255
-        else:
-            mask = np.argmax(mask_pred, axis=-1).astype(np.uint8)
-            mask = (mask * (255 // max(mask.max(), 1))).astype(np.uint8)
+    mask_pred = unet_model.predict(inp, verbose=0)[0]  # (H, W, C) or (H, W, 1)
 
-        binary    = (mask > 127).astype(np.uint8)
-        drivable  = round(binary.sum() / binary.size * 100, 1)
+    # Handle binary or multi-class masks
+    if mask_pred.shape[-1] == 1:
+        mask = (mask_pred[:, :, 0] > 0.5).astype(np.uint8) * 255
+    else:
+        mask = np.argmax(mask_pred, axis=-1).astype(np.uint8)
+        mask = (mask * (255 // max(mask.max(), 1))).astype(np.uint8)
 
-        mask_rgb  = cv2.cvtColor(
-            cv2.resize(mask, (orig.shape[1], orig.shape[0])),
-            cv2.COLOR_GRAY2BGR
-        )
-        overlay   = cv2.addWeighted(orig, 0.6, mask_rgb, 0.4, 0)
+    # ─── HORIZON MASKING ──────────────────────────────────────────────────────
+    # Calculate the pixel row where the horizon starts
+    horizon_y = int(mask.shape[0] * horizon_ratio)
+    
+    # Force everything above the horizon to 0 (Not Drivable)
+    mask[:horizon_y, :] = 0
 
-        return overlay, mask, drivable
+    # Compute drivable area % (Based ONLY on the area below the horizon)
+    binary = (mask > 127).astype(np.uint8)
+    ground_pixels = binary.size - (horizon_y * mask.shape[1])
+    
+    if ground_pixels > 0:
+        drivable = round((binary.sum() / ground_pixels) * 100, 1)
+    else:
+        drivable = 0.0
+    # ──────────────────────────────────────────────────────────────────────────
+
+    # Overlay mask on original image
+    mask_resized = cv2.resize(mask, (orig.shape[1], orig.shape[0]), interpolation=cv2.INTER_NEAREST)
+    mask_rgb  = cv2.cvtColor(mask_resized, cv2.COLOR_GRAY2BGR)
+    
+    overlay   = cv2.addWeighted(orig, 0.6, mask_rgb, 0.4, 0)
+
+    # Draw a visual reference line for the horizon so you can tune the ratio
+    orig_horizon_y = int(orig.shape[0] * horizon_ratio)
+    cv2.line(overlay, (0, orig_horizon_y), (orig.shape[1], orig_horizon_y), (0, 0, 255), 2)
+
+    print(f"   Drivable area (below horizon): {drivable}%")
+    return overlay, mask, drivable
 
 
 def run_unet(unet_model, image_path, input_size):
