@@ -1,7 +1,13 @@
 # 🚗 AI Driving Co-Pilot — FastAPI + HTML/CSS/JS
 
 A modern, high-performance autonomous driving assistant using FastAPI backend with real-time video processing, object detection, road segmentation, and AI-powered decision making.
+## WorkFlow 
+<p align="center">
+  <img src="assets/workflow.png" width="1000">
+</p>
+The AI Driving Co-Pilot combines computer vision, intent understanding, and LLM reasoning to provide driving assistance and scene understanding.
 
+---
 ## 🎯 Features
 
 - **Real-time Webcam Streaming** — Live video feed with YOLO object detection and UNet road segmentation
@@ -11,6 +17,18 @@ A modern, high-performance autonomous driving assistant using FastAPI backend wi
   - **Transformer (Qwen)** — Natural language response generation
 - **Performance Optimized** — FastAPI backend with efficient frame processing and threading
 - **Modern UI** — Clean, responsive dark-themed interface with real-time telemetry
+
+
+## 📊 Example Output
+
+<p align="center">
+  <img src="assets/pipeline_output.png" width="1000">
+</p>
+
+<p align="center">
+  <img src="assets/pipeline_output_2.png" width="1000">
+</p>
+
 
 ## 📋 Requirements
 
