@@ -1,4 +1,4 @@
-# 🚗 AI Driving Co-Pilot — FastAPI + HTML/CSS/JS
+# 🚗 AI Driving Co-Pilot 
 
 A modern, high-performance autonomous driving assistant using FastAPI backend with real-time video processing, object detection, road segmentation, and AI-powered decision making.
 ## WorkFlow 
